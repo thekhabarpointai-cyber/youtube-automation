@@ -2,45 +2,72 @@ name: YouTube Automation
 
 on:
   workflow_dispatch:
+
   schedule:
     - cron: "0 4 * * *"
     - cron: "0 9 * * *"
     - cron: "0 14 * * *"
 
+
 jobs:
+
   automation:
+
     runs-on: ubuntu-latest
 
+
     steps:
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
+
       - name: Set up Python
         uses: actions/setup-python@v5
+
         with:
           python-version: "3.12"
 
+
       - name: Install Python packages
         run: |
+
           python -m pip install --upgrade pip
+
           pip install -r requirements.txt
+
 
       - name: Install audio and video tools
         run: |
+
           sudo apt-get update
+
           sudo apt-get install -y ffmpeg espeak
+
 
       - name: Run YouTube automation
         env:
+
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: python main.py
+
+        run: |
+
+          python main.py
+
 
       - name: Upload generated files
         uses: actions/upload-artifact@v4
+
         with:
-          name: generated-files
+
+          name: generated-news-video
+
           path: |
-            script.txt
-            voice.wav
+
             output.mp4
+            script.txt
+            voice.mp3
+            subtitles.srt
+            news.jpg
+
           if-no-files-found: ignore
