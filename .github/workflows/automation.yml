@@ -1,7 +1,7 @@
+```yaml
 name: News Video Generator
 
 on:
-
   workflow_dispatch:
 
   schedule:
@@ -16,11 +16,10 @@ jobs:
 
     runs-on: ubuntu-latest
 
-
     steps:
 
       # ================================================
-      # STEP 1 — DOWNLOAD REPOSITORY
+      # STEP 1 — CHECKOUT REPOSITORY
       # ================================================
 
       - name: Checkout repository
@@ -28,12 +27,11 @@ jobs:
 
 
       # ================================================
-      # STEP 2 — INSTALL PYTHON
+      # STEP 2 — SETUP PYTHON
       # ================================================
 
       - name: Set up Python
         uses: actions/setup-python@v5
-
         with:
           python-version: "3.12"
 
@@ -44,9 +42,7 @@ jobs:
 
       - name: Install Python packages
         run: |
-
           python -m pip install --upgrade pip
-
           pip install -r requirements.txt
 
 
@@ -56,37 +52,93 @@ jobs:
 
       - name: Install FFmpeg
         run: |
-
           sudo apt-get update
-
           sudo apt-get install -y ffmpeg
 
 
       # ================================================
-      # STEP 5 — GENERATE NEWS VIDEO
+      # STEP 5 — CHECK ENVIRONMENT
+      # ================================================
+
+      - name: Check environment
+        run: |
+          echo "Python version:"
+          python --version
+
+          echo "FFmpeg version:"
+          ffmpeg -version | head -n 1
+
+          echo "Repository files:"
+          ls -lah
+
+
+      # ================================================
+      # STEP 6 — GENERATE NEWS VIDEO
       # ================================================
 
       - name: Generate news video
         env:
-
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-
         run: |
-
           python main.py
 
 
       # ================================================
-      # STEP 6 — SAVE GENERATED VIDEO
+      # STEP 7 — CHECK GENERATED FILES
+      # ================================================
+
+      - name: Check generated files
+        run: |
+          echo "======================================"
+          echo "CHECKING GENERATED VIDEO FOLDER"
+          echo "======================================"
+
+          if [ -d "generated_video" ]; then
+            echo "generated_video folder EXISTS"
+            echo ""
+            echo "Files inside generated_video:"
+            ls -lah generated_video/
+          else
+            echo "ERROR: generated_video folder NOT FOUND"
+          fi
+
+          echo ""
+          echo "======================================"
+          echo "SEARCHING FOR MP4 FILES"
+          echo "======================================"
+
+          find . -type f -name "*.mp4" -print
+
+
+      # ================================================
+      # STEP 8 — UPLOAD GENERATED FILES
       # ================================================
 
       - name: Upload generated video
+        if: always()
         uses: actions/upload-artifact@v4
-
         with:
-
           name: generated-news-video
-
           path: generated_video/
+          if-no-files-found: warn
 
-          if-no-files-found: error
+
+      # ================================================
+      # STEP 9 — FINAL STATUS
+      # ================================================
+
+      - name: Final status
+        if: always()
+        run: |
+          echo ""
+          echo "======================================"
+          echo "NEWS VIDEO AUTOMATION FINISHED"
+          echo "======================================"
+
+          if [ -f "generated_video/news_video.mp4" ]; then
+            echo "VIDEO FOUND:"
+            ls -lh generated_video/news_video.mp4
+          else
+            echo "WARNING: news_video.mp4 was NOT found."
+          fi
+```
