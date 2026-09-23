@@ -24,6 +24,8 @@ if not HF_TOKEN:
 VOICE = "hi-IN-MadhurNeural"
 CHANNEL_NAME = "digital info wallah"
 
+OUTPUT = "output.mp4"
+
 
 # =========================================================
 # STEP 1 — FETCH NEWS
@@ -64,7 +66,7 @@ print(title)
 
 
 # =========================================================
-# STEP 2 — FIND IMAGE
+# STEP 2 — FIND NEWS IMAGE
 # =========================================================
 
 print("\nSTEP 2: Finding news image...")
@@ -120,7 +122,7 @@ else:
 
 
 # =========================================================
-# STEP 3 — GENERATE AI SCRIPT
+# STEP 3 — GENERATE AI HINDI SCRIPT
 # =========================================================
 
 print("\nSTEP 3: Generating Hindi news script...")
@@ -295,63 +297,61 @@ with open(
             f"{line}\n\n"
         )
 
-
 print("Subtitles created.")
 
 
 # =========================================================
-# STEP 6 — CREATE PROFESSIONAL VIDEO
+# STEP 6 — PROFESSIONAL VIDEO
 # =========================================================
 
 print("\nSTEP 6: Creating professional 9:16 video...")
 
 
-OUTPUT = "output.mp4"
-
-
 if image_url and os.path.exists("news.jpg"):
 
-    print("Using news image.")
-
-    video_input = "news.jpg"
-
-else:
-
-    print("No news image. Using background.")
-
-    video_input = None
-
-
-if video_input:
+    print("Using news image with multiple visual movements.")
 
     filter_complex = (
         "scale=1080:1920:"
         "force_original_aspect_ratio=increase,"
         "crop=1080:1920,"
+        
+        # Slow cinematic zoom
         "zoompan="
-        "z='min(zoom+0.0008,1.08)':"
+        "z='min(zoom+0.0007,1.12)':"
+        "x='iw/2-(iw/zoom/2)':"
+        "y='ih/2-(ih/zoom/2)':"
         "d=1:"
-        "s=1080x1920,"
+        "s=1080x1920:"
+        "fps=30,"
+        
+        # Top news banner
         "drawbox="
         "x=0:y=0:"
         "w=1080:h=230:"
         "color=black@0.78:t=fill,"
+        
         "drawtext="
         "text='BREAKING NEWS':"
         "fontcolor=white:"
         "fontsize=68:"
         "x=(w-text_w)/2:"
         "y=65,"
+        
+        # Bottom channel banner
         "drawbox="
         "x=0:y=1650:"
         "w=1080:h=270:"
         "color=black@0.82:t=fill,"
+        
         "drawtext="
         "text='digital info wallah':"
         "fontcolor=white:"
         "fontsize=45:"
         "x=(w-text_w)/2:"
         "y=1680,"
+        
+        # Hindi subtitles
         "subtitles=subtitles.srt:"
         "force_style="
         "'FontSize=24,"
@@ -401,6 +401,8 @@ if video_input:
 
 else:
 
+    print("No image found. Using professional background.")
+
     ffmpeg_command = [
 
         "ffmpeg",
@@ -422,18 +424,21 @@ else:
             "x=0:y=0:"
             "w=1080:h=230:"
             "color=black@0.8:t=fill,"
+
             "drawtext="
             "text='BREAKING NEWS':"
             "fontcolor=white:"
             "fontsize=68:"
             "x=(w-text_w)/2:"
             "y=65,"
+
             "drawtext="
             "text='digital info wallah':"
             "fontcolor=white:"
             "fontsize=45:"
             "x=(w-text_w)/2:"
             "y=1680,"
+
             "subtitles=subtitles.srt:"
             "force_style="
             "'FontSize=24,"
