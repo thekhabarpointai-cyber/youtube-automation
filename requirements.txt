@@ -1,4 +1,6 @@
+```text
 huggingface_hub
 edge-tts
 requests
 Pillow
+```
