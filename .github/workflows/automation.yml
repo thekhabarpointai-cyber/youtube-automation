@@ -20,16 +20,20 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install audio/video tools
+      - name: Install audio and video tools
         run: |
-        sudo apt-get update
-        sudo apt-get install -y ffmpeg espeak
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg espeak
 
-      - name: Create video
+      - name: Run YouTube automation
         run: python main.py
 
-      - name: Upload generated video
+      - name: Upload generated files
         uses: actions/upload-artifact@v4
         with:
-          name: generated-video
-          path: output.mp4
+          name: generated-files
+          path: |
+            script.txt
+            voice.wav
+            output.mp4
+          if-no-files-found: ignore
