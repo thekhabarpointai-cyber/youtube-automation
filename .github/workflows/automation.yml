@@ -4,11 +4,6 @@ name: News Video Generator
 on:
   workflow_dispatch:
 
-  schedule:
-    - cron: "0 4 * * *"
-    - cron: "0 9 * * *"
-    - cron: "0 14 * * *"
-
 jobs:
   generate-video:
 
@@ -34,16 +29,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ffmpeg
 
-      - name: Check environment
+      - name: Check files
         run: |
-          echo "Python:"
-          python --version
-
-          echo "FFmpeg:"
-          ffmpeg -version | head -n 1
-
-          echo "Repository:"
-          ls -lah
+          echo "Repository files:"
+          find . -maxdepth 3 -type f | sort
 
       - name: Generate news video
         env:
@@ -51,46 +40,28 @@ jobs:
         run: |
           python main.py
 
-      - name: Check generated files
+      - name: Check generated video
         if: always()
         run: |
-          echo "======================================"
-          echo "GENERATED VIDEO FOLDER"
-          echo "======================================"
+          echo "================================"
+          echo "GENERATED VIDEO"
+          echo "================================"
 
           if [ -d "generated_video" ]; then
-            echo "generated_video folder found."
             ls -lah generated_video/
           else
-            echo "ERROR: generated_video folder not found."
+            echo "generated_video folder does not exist"
           fi
 
           echo ""
-          echo "======================================"
-          echo "SEARCHING FOR MP4"
-          echo "======================================"
-
+          echo "MP4 files:"
           find . -type f -name "*.mp4" -print
 
-      - name: Upload generated video
+      - name: Upload video
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: generated-news-video
           path: generated_video/
           if-no-files-found: warn
-
-      - name: Final status
-        if: always()
-        run: |
-          echo "======================================"
-          echo "FINAL STATUS"
-          echo "======================================"
-
-          if [ -f "generated_video/news_video.mp4" ]; then
-            echo "SUCCESS: news_video.mp4 found."
-            ls -lh generated_video/news_video.mp4
-          else
-            echo "WARNING: news_video.mp4 was not found."
-          fi
 ```
