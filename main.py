@@ -1,5 +1,4 @@
 import os
-import urllib.request
 
 token = os.environ.get("HF_TOKEN")
 
