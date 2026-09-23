@@ -26,6 +26,8 @@ jobs:
           sudo apt-get install -y ffmpeg espeak
 
       - name: Run YouTube automation
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: python main.py
 
       - name: Upload generated files
