@@ -1,8 +1,7 @@
 import urllib.request
 import xml.etree.ElementTree as ET
 import subprocess
-import re
-import os
+from pathlib import Path
 
 RSS_URL = "https://news.google.com/rss?hl=en-IN&gl=IN&ceid=IN:en"
 
@@ -14,8 +13,7 @@ root = ET.fromstring(data)
 items = root.findall(".//item")
 
 if not items:
-    print("No news found.")
-    raise SystemExit(1)
+    raise SystemExit("No news found.")
 
 title = items[0].findtext("title", default="आज की बड़ी खबर")
 
@@ -27,27 +25,38 @@ script = f"""
 इस खबर से जुड़ी महत्वपूर्ण जानकारी सामने आई है।
 हम आपको इस खबर के मुख्य अपडेट आसान भाषा में बताएंगे।
 
-इस खबर से जुड़े नए अपडेट के लिए हमारे चैनल को सब्सक्राइब करें
-और वीडियो को लाइक जरूर करें।
+ऐसी ही खबरों के लिए हमारे चैनल को सब्सक्राइब करें।
 
 धन्यवाद!
 """
 
-with open("script.txt", "w", encoding="utf-8") as file:
-    file.write(script)
+Path("script.txt").write_text(script, encoding="utf-8")
 
-print("Hindi script created successfully!")
+print("Script created.")
 
-# Remove unsupported characters for the first audio test
-safe_text = re.sub(r"[^\x00-\x7F]+", " ", script)
-safe_text = " ".join(safe_text.split())
+# Temporary voice test
+subprocess.run(
+    ["espeak", "-w", "voice.wav", "Namaskar dosto. Aaj ki badi khabar hai. " + title],
+    check=True
+)
 
-# Generate temporary speech using espeak
+print("Voice created.")
+
+# Create 9:16 news video
 subprocess.run([
-    "espeak",
-    "-w",
-    "voice.wav",
-    safe_text
+    "ffmpeg",
+    "-y",
+    "-f", "lavfi",
+    "-i", "color=c=black:s=1080x1920:d=20",
+    "-i", "voice.wav",
+    "-vf",
+    "drawtext=text='BREAKING NEWS':fontcolor=white:fontsize=90:x=(w-text_w)/2:y=400,"
+    "drawtext=text='DIGITAL NEWS':fontcolor=white:fontsize=55:x=(w-text_w)/2:y=600",
+    "-c:v", "libx264",
+    "-c:a", "aac",
+    "-shortest",
+    "-pix_fmt", "yuv420p",
+    "output.mp4"
 ], check=True)
 
-print("Voice generated successfully!")
+print("9:16 news video created successfully!")
