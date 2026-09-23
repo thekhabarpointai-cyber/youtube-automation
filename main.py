@@ -122,7 +122,7 @@ else:
 
 
 # =========================================================
-# STEP 3 — GENERATE AI HINDI SCRIPT
+# STEP 3 — AI HINDI SCRIPT
 # =========================================================
 
 print("\nSTEP 3: Generating Hindi news script...")
@@ -209,7 +209,7 @@ print("Hindi voice generated.")
 
 
 # =========================================================
-# STEP 5 — CREATE SUBTITLES
+# STEP 5 — SUBTITLES
 # =========================================================
 
 print("\nSTEP 5: Creating subtitles...")
@@ -236,6 +236,7 @@ def split_text(text, words_per_line=7):
             current = []
 
     if current:
+
         lines.append(
             " ".join(current)
         )
@@ -301,57 +302,123 @@ print("Subtitles created.")
 
 
 # =========================================================
-# STEP 6 — PROFESSIONAL VIDEO
+# STEP 6 — CREATE 3 VISUAL SCENES
 # =========================================================
 
-print("\nSTEP 6: Creating professional 9:16 video...")
+print("\nSTEP 6: Creating 3-scene professional video...")
 
 
 if image_url and os.path.exists("news.jpg"):
 
-    print("Using news image with multiple visual movements.")
+    print("Creating multiple visual scenes...")
 
     filter_complex = (
+
+        # =================================================
+        # SCENE 1
+        # Full image with slow zoom
+        # =================================================
+
+        "[0:v]"
         "scale=1080:1920:"
         "force_original_aspect_ratio=increase,"
         "crop=1080:1920,"
-        
-        # Slow cinematic zoom
         "zoompan="
-        "z='min(zoom+0.0007,1.12)':"
+        "z='min(zoom+0.0005,1.08)':"
         "x='iw/2-(iw/zoom/2)':"
         "y='ih/2-(ih/zoom/2)':"
-        "d=1:"
+        "d=150:"
         "s=1080x1920:"
         "fps=30,"
-        
-        # Top news banner
+        "trim=duration=5,"
+        "setpts=PTS-STARTPTS"
+        "[scene1];"
+
+
+        # =================================================
+        # SCENE 2
+        # Zoomed image
+        # =================================================
+
+        "[0:v]"
+        "scale=1300:2300:"
+        "force_original_aspect_ratio=increase,"
+        "crop=1080:1920,"
+        "zoompan="
+        "z='min(zoom+0.0008,1.15)':"
+        "x='iw/2-(iw/zoom/2)':"
+        "y='ih/2-(ih/zoom/2)':"
+        "d=150:"
+        "s=1080x1920:"
+        "fps=30,"
+        "trim=duration=5,"
+        "setpts=PTS-STARTPTS"
+        "[scene2];"
+
+
+        # =================================================
+        # SCENE 3
+        # Different crop
+        # =================================================
+
+        "[0:v]"
+        "scale=1500:2600:"
+        "force_original_aspect_ratio=increase,"
+        "crop=1080:1920,"
+        "zoompan="
+        "z='min(zoom+0.0006,1.10)':"
+        "x='(iw-iw/zoom)*0.25':"
+        "y='(ih-ih/zoom)*0.35':"
+        "d=150:"
+        "s=1080x1920:"
+        "fps=30,"
+        "trim=duration=5,"
+        "setpts=PTS-STARTPTS"
+        "[scene3];"
+
+
+        # =================================================
+        # JOIN THREE SCENES
+        # =================================================
+
+        "[scene1]"
+        "[scene2]"
+        "[scene3]"
+        "concat=n=3:v=1:a=0,"
+        "setpts=PTS-STARTPTS"
+        "[video];"
+
+
+        # =================================================
+        # NEWS GRAPHICS
+        # =================================================
+
+        "[video]"
+
         "drawbox="
         "x=0:y=0:"
         "w=1080:h=230:"
         "color=black@0.78:t=fill,"
-        
+
         "drawtext="
         "text='BREAKING NEWS':"
         "fontcolor=white:"
         "fontsize=68:"
         "x=(w-text_w)/2:"
         "y=65,"
-        
-        # Bottom channel banner
+
         "drawbox="
         "x=0:y=1650:"
         "w=1080:h=270:"
         "color=black@0.82:t=fill,"
-        
+
         "drawtext="
         "text='digital info wallah':"
         "fontcolor=white:"
         "fontsize=45:"
         "x=(w-text_w)/2:"
         "y=1680,"
-        
-        # Hindi subtitles
+
         "subtitles=subtitles.srt:"
         "force_style="
         "'FontSize=24,"
@@ -360,7 +427,9 @@ if image_url and os.path.exists("news.jpg"):
         "Outline=2,"
         "Alignment=2,"
         "MarginV=120'"
+        "[final]"
     )
+
 
     ffmpeg_command = [
 
@@ -376,8 +445,14 @@ if image_url and os.path.exists("news.jpg"):
         "-i",
         "voice.mp3",
 
-        "-vf",
+        "-filter_complex",
         filter_complex,
+
+        "-map",
+        "[final]",
+
+        "-map",
+        "1:a",
 
         "-c:v",
         "libx264",
@@ -399,9 +474,10 @@ if image_url and os.path.exists("news.jpg"):
         OUTPUT
     ]
 
+
 else:
 
-    print("No image found. Using professional background.")
+    print("No image found. Creating backup video.")
 
     ffmpeg_command = [
 
@@ -470,6 +546,10 @@ else:
     ]
 
 
+# =========================================================
+# RUN FFMPEG
+# =========================================================
+
 subprocess.run(
     ffmpeg_command,
     check=True
@@ -481,7 +561,7 @@ subprocess.run(
 # =========================================================
 
 print("\n========================================")
-print("PROFESSIONAL NEWS VIDEO CREATED")
+print("3-SCENE NEWS VIDEO CREATED")
 print("========================================")
 
 print("Script      : script.txt")
