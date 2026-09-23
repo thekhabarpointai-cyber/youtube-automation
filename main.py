@@ -22,6 +22,7 @@ if not HF_TOKEN:
     raise SystemExit("ERROR: HF_TOKEN was not found.")
 
 VOICE = "hi-IN-MadhurNeural"
+CHANNEL_NAME = "digital info wallah"
 
 
 # =========================================================
@@ -40,7 +41,7 @@ root = ET.fromstring(data)
 items = root.findall(".//item")
 
 if not items:
-    raise SystemExit("ERROR: No news found.")
+    raise SystemExit("No news found.")
 
 item = items[0]
 
@@ -58,12 +59,12 @@ description = html.unescape(
     )
 )
 
-print("News:")
+print("NEWS:")
 print(title)
 
 
 # =========================================================
-# STEP 2 — FIND NEWS IMAGE
+# STEP 2 — FIND IMAGE
 # =========================================================
 
 print("\nSTEP 2: Finding news image...")
@@ -119,7 +120,7 @@ else:
 
 
 # =========================================================
-# STEP 3 — AI NEWS SCRIPT
+# STEP 3 — GENERATE AI SCRIPT
 # =========================================================
 
 print("\nSTEP 3: Generating Hindi news script...")
@@ -132,25 +133,25 @@ client = InferenceClient(
 prompt = f"""
 आप एक प्रोफेशनल भारतीय हिंदी न्यूज़ एंकर हैं।
 
-इस खबर के आधार पर लगभग 45 से 60 सेकंड की
-सरल और स्पष्ट हिंदी न्यूज़ स्क्रिप्ट लिखें।
+इस खबर के आधार पर 45 से 60 सेकंड की
+सरल और आकर्षक हिंदी न्यूज़ स्क्रिप्ट लिखें।
 
-खबर का शीर्षक:
+खबर:
 {title}
 
-उपलब्ध जानकारी:
+जानकारी:
 {description}
 
 नियम:
 
 1. शुरुआत "नमस्कार दोस्तों!" से करें।
 2. खबर का मुख्य विषय स्पष्ट बताएं।
-3. केवल उपलब्ध जानकारी का उपयोग करें।
+3. केवल उपलब्ध जानकारी का इस्तेमाल करें।
 4. कोई तथ्य खुद से न बनाएं।
 5. आसान बोलने वाली हिंदी इस्तेमाल करें।
 6. स्क्रिप्ट 45 से 60 सेकंड की हो।
 7. अंत में चैनल को सब्सक्राइब करने के लिए कहें।
-8. Emoji का इस्तेमाल न करें।
+8. Emoji इस्तेमाल न करें।
 9. केवल स्क्रिप्ट दें।
 """
 
@@ -171,14 +172,14 @@ with open(
     "script.txt",
     "w",
     encoding="utf-8"
-) as file:
-    file.write(script)
+) as f:
+    f.write(script)
 
 print("Hindi script generated.")
 
 
 # =========================================================
-# STEP 4 — GENERATE HINDI VOICE
+# STEP 4 — HINDI VOICE
 # =========================================================
 
 print("\nSTEP 4: Generating Hindi voice...")
@@ -206,13 +207,13 @@ print("Hindi voice generated.")
 
 
 # =========================================================
-# STEP 5 — CREATE SUBTITLE FILE
+# STEP 5 — CREATE SUBTITLES
 # =========================================================
 
-print("\nSTEP 5: Creating Hindi subtitles...")
+print("\nSTEP 5: Creating subtitles...")
 
 
-def split_text(text, words_per_line=8):
+def split_text(text, words_per_line=7):
 
     words = text.split()
 
@@ -233,18 +234,11 @@ def split_text(text, words_per_line=8):
             current = []
 
     if current:
-
         lines.append(
             " ".join(current)
         )
 
     return lines
-
-
-subtitle_lines = split_text(
-    script,
-    words_per_line=8
-)
 
 
 def format_time(seconds):
@@ -255,9 +249,7 @@ def format_time(seconds):
         (seconds % 3600) // 60
     )
 
-    secs = int(
-        seconds % 60
-    )
+    secs = int(seconds % 60)
 
     milliseconds = int(
         (seconds - int(seconds)) * 1000
@@ -271,19 +263,17 @@ def format_time(seconds):
     )
 
 
-# Approximate timing based on number of lines
-duration_per_line = 3.5
+lines = split_text(script)
 
+duration_per_line = 3.5
 
 with open(
     "subtitles.srt",
     "w",
     encoding="utf-8"
-) as subtitle_file:
+) as f:
 
-    for i, line in enumerate(
-        subtitle_lines
-    ):
+    for i, line in enumerate(lines):
 
         start = i * duration_per_line
 
@@ -292,35 +282,85 @@ with open(
             * duration_per_line
         )
 
-        subtitle_file.write(
+        f.write(
             f"{i + 1}\n"
         )
 
-        subtitle_file.write(
+        f.write(
             f"{format_time(start)} --> "
             f"{format_time(end)}\n"
         )
 
-        subtitle_file.write(
+        f.write(
             f"{line}\n\n"
         )
 
 
-print("Hindi subtitles created.")
+print("Subtitles created.")
 
 
 # =========================================================
-# STEP 6 — CREATE FINAL 9:16 VIDEO
+# STEP 6 — CREATE PROFESSIONAL VIDEO
 # =========================================================
 
-print("\nSTEP 6: Creating final 9:16 video...")
+print("\nSTEP 6: Creating professional 9:16 video...")
 
 
-if image_url and os.path.exists(
-    "news.jpg"
-):
+OUTPUT = "output.mp4"
+
+
+if image_url and os.path.exists("news.jpg"):
+
+    print("Using news image.")
 
     video_input = "news.jpg"
+
+else:
+
+    print("No news image. Using background.")
+
+    video_input = None
+
+
+if video_input:
+
+    filter_complex = (
+        "scale=1080:1920:"
+        "force_original_aspect_ratio=increase,"
+        "crop=1080:1920,"
+        "zoompan="
+        "z='min(zoom+0.0008,1.08)':"
+        "d=1:"
+        "s=1080x1920,"
+        "drawbox="
+        "x=0:y=0:"
+        "w=1080:h=230:"
+        "color=black@0.78:t=fill,"
+        "drawtext="
+        "text='BREAKING NEWS':"
+        "fontcolor=white:"
+        "fontsize=68:"
+        "x=(w-text_w)/2:"
+        "y=65,"
+        "drawbox="
+        "x=0:y=1650:"
+        "w=1080:h=270:"
+        "color=black@0.82:t=fill,"
+        "drawtext="
+        "text='digital info wallah':"
+        "fontcolor=white:"
+        "fontsize=45:"
+        "x=(w-text_w)/2:"
+        "y=1680,"
+        "subtitles=subtitles.srt:"
+        "force_style="
+        "'FontSize=24,"
+        "PrimaryColour=&H00FFFFFF,"
+        "OutlineColour=&H00000000,"
+        "Outline=2,"
+        "Alignment=2,"
+        "MarginV=120'"
+    )
 
     ffmpeg_command = [
 
@@ -331,37 +371,13 @@ if image_url and os.path.exists(
         "1",
 
         "-i",
-        video_input,
+        "news.jpg",
 
         "-i",
         "voice.mp3",
 
         "-vf",
-
-        (
-            "scale=1080:1920:"
-            "force_original_aspect_ratio=increase,"
-            "crop=1080:1920,"
-            "drawbox="
-            "x=0:y=0:"
-            "w=1080:h=220:"
-            "color=black@0.75:t=fill,"
-            "drawtext="
-            "text='BREAKING NEWS':"
-            "fontcolor=white:"
-            "fontsize=70:"
-            "x=(w-text_w)/2:"
-            "y=70,"
-            "subtitles=subtitles.srt:"
-            "force_style="
-            "'FontName=DejaVu Sans,"
-            "FontSize=22,"
-            "PrimaryColour=&H00FFFFFF,"
-            "OutlineColour=&H00000000,"
-            "Outline=2,"
-            "Alignment=2,"
-            "MarginV=180'"
-        ),
+        filter_complex,
 
         "-c:v",
         "libx264",
@@ -380,15 +396,10 @@ if image_url and os.path.exists(
         "-pix_fmt",
         "yuv420p",
 
-        "output.mp4"
+        OUTPUT
     ]
 
 else:
-
-    print(
-        "No image available. "
-        "Using black background."
-    )
 
     ffmpeg_command = [
 
@@ -407,20 +418,30 @@ else:
         "-vf",
 
         (
+            "drawbox="
+            "x=0:y=0:"
+            "w=1080:h=230:"
+            "color=black@0.8:t=fill,"
             "drawtext="
             "text='BREAKING NEWS':"
             "fontcolor=white:"
-            "fontsize=90:"
+            "fontsize=68:"
             "x=(w-text_w)/2:"
-            "y=400,"
+            "y=65,"
+            "drawtext="
+            "text='digital info wallah':"
+            "fontcolor=white:"
+            "fontsize=45:"
+            "x=(w-text_w)/2:"
+            "y=1680,"
             "subtitles=subtitles.srt:"
             "force_style="
-            "'FontSize=22,"
+            "'FontSize=24,"
             "PrimaryColour=&H00FFFFFF,"
             "OutlineColour=&H00000000,"
             "Outline=2,"
             "Alignment=2,"
-            "MarginV=180'"
+            "MarginV=120'"
         ),
 
         "-c:v",
@@ -440,7 +461,7 @@ else:
         "-pix_fmt",
         "yuv420p",
 
-        "output.mp4"
+        OUTPUT
     ]
 
 
@@ -454,13 +475,14 @@ subprocess.run(
 # FINISHED
 # =========================================================
 
-print("\n================================")
-print("AUTOMATION COMPLETED")
-print("================================")
+print("\n========================================")
+print("PROFESSIONAL NEWS VIDEO CREATED")
+print("========================================")
 
-print("script.txt       created")
-print("voice.mp3        created")
-print("subtitles.srt    created")
-print("output.mp4       created")
+print("Script      : script.txt")
+print("Voice       : voice.mp3")
+print("Subtitles   : subtitles.srt")
+print("Image       : news.jpg")
+print("Final video : output.mp4")
 
-print("\n9:16 Hindi news video with captions is ready!")
+print("\nSUCCESS!")
