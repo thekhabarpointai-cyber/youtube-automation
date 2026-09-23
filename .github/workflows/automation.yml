@@ -4,7 +4,13 @@ name: News Video Generator
 on:
   workflow_dispatch:
 
+  schedule:
+    - cron: "0 4 * * *"
+    - cron: "0 9 * * *"
+    - cron: "0 14 * * *"
+
 jobs:
+
   generate-video:
 
     runs-on: ubuntu-latest
@@ -14,54 +20,73 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
+
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
 
       - name: Install Python packages
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+
       - name: Install FFmpeg
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg
 
-      - name: Check files
-        run: |
-          echo "Repository files:"
-          find . -maxdepth 3 -type f | sort
 
-      - name: Generate news video
+      - name: Check installation
+        run: |
+          echo "Python:"
+          python --version
+
+          echo "FFmpeg:"
+          ffmpeg -version | head -n 1
+
+          echo "Files:"
+          ls -lah
+
+
+      - name: Generate video
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           python main.py
 
-      - name: Check generated video
+
+      - name: Verify generated files
         if: always()
         run: |
           echo "================================"
-          echo "GENERATED VIDEO"
+          echo "GENERATED VIDEO FILES"
           echo "================================"
 
           if [ -d "generated_video" ]; then
             ls -lah generated_video/
           else
-            echo "generated_video folder does not exist"
+            echo "generated_video folder not found"
+            exit 1
           fi
 
           echo ""
           echo "MP4 files:"
-          find . -type f -name "*.mp4" -print
 
-      - name: Upload video
-        if: always()
+          find generated_video \
+            -type f \
+            -name "*.mp4" \
+            -ls
+
+
+      - name: Upload video artifact
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: generated-news-video
           path: generated_video/
-          if-no-files-found: warn
+          if-no-files-found: error
+          retention-days: 7
 ```
