@@ -5,6 +5,7 @@ import asyncio
 import subprocess
 import html
 import re
+import time
 
 from huggingface_hub import InferenceClient
 import edge_tts
@@ -28,24 +29,83 @@ OUTPUT = "output.mp4"
 
 
 # =========================================================
-# STEP 1 — FETCH NEWS
+# STEP 1 — FETCH NEWS WITH RETRIES
 # =========================================================
 
 print("STEP 1: Fetching latest Indian news...")
 
-data = urllib.request.urlopen(
-    RSS_URL,
-    timeout=30
-).read()
+
+def fetch_news():
+
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 "
+            "(Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 "
+            "(KHTML, like Gecko) "
+            "Chrome/120.0 Safari/537.36"
+        )
+    }
+
+    request = urllib.request.Request(
+        RSS_URL,
+        headers=headers
+    )
+
+    for attempt in range(3):
+
+        try:
+
+            print(
+                f"Trying Google News RSS "
+                f"(attempt {attempt + 1}/3)..."
+            )
+
+            response = urllib.request.urlopen(
+                request,
+                timeout=30
+            )
+
+            data = response.read()
+
+            print("Google News RSS connected.")
+
+            return data
+
+        except Exception as e:
+
+            print(
+                f"Attempt {attempt + 1} failed:"
+            )
+
+            print(e)
+
+            if attempt < 2:
+
+                print(
+                    "Waiting 10 seconds before retry..."
+                )
+
+                time.sleep(10)
+
+    raise SystemExit(
+        "ERROR: Google News RSS unavailable "
+        "after 3 attempts."
+    )
+
+
+data = fetch_news()
 
 root = ET.fromstring(data)
 
 items = root.findall(".//item")
 
 if not items:
-    raise SystemExit("No news found.")
+    raise SystemExit("ERROR: No news found.")
+
 
 item = items[0]
+
 
 title = html.unescape(
     item.findtext(
@@ -54,6 +114,7 @@ title = html.unescape(
     )
 )
 
+
 description = html.unescape(
     item.findtext(
         "description",
@@ -61,7 +122,8 @@ description = html.unescape(
     )
 )
 
-print("NEWS:")
+
+print("\nNEWS:")
 print(title)
 
 
@@ -71,18 +133,25 @@ print(title)
 
 print("\nSTEP 2: Finding news image...")
 
+
 image_url = None
+
 
 for child in item:
 
     tag = child.tag.lower()
 
-    if "content" in tag or "thumbnail" in tag:
+    if (
+        "content" in tag
+        or "thumbnail" in tag
+    ):
 
         url = child.attrib.get("url")
 
         if url:
+
             image_url = url
+
             break
 
 
@@ -95,6 +164,7 @@ if not image_url:
     )
 
     if image_match:
+
         image_url = image_match.group(0)
 
 
@@ -102,35 +172,66 @@ if image_url:
 
     try:
 
-        urllib.request.urlretrieve(
-            image_url,
-            "news.jpg"
+        print(
+            "Downloading news image..."
         )
 
-        print("News image downloaded.")
+        image_request = urllib.request.Request(
+            image_url,
+            headers={
+                "User-Agent": "Mozilla/5.0"
+            }
+        )
+
+        with urllib.request.urlopen(
+            image_request,
+            timeout=30
+        ) as response:
+
+            image_data = response.read()
+
+        with open(
+            "news.jpg",
+            "wb"
+        ) as f:
+
+            f.write(image_data)
+
+        print(
+            "News image downloaded successfully."
+        )
 
     except Exception as e:
 
-        print("Image download failed:")
+        print(
+            "Image download failed:"
+        )
+
         print(e)
 
         image_url = None
 
 else:
 
-    print("No news image found.")
+    print(
+        "No news image found."
+    )
 
 
 # =========================================================
-# STEP 3 — AI HINDI SCRIPT
+# STEP 3 — GENERATE AI HINDI SCRIPT
 # =========================================================
 
-print("\nSTEP 3: Generating Hindi news script...")
+print(
+    "\nSTEP 3: Generating Hindi news script..."
+)
+
 
 client = InferenceClient(
     api_key=HF_TOKEN,
     provider="auto"
 )
+
 
 prompt = f"""
 आप एक प्रोफेशनल भारतीय हिंदी न्यूज़ एंकर हैं।
@@ -157,6 +258,7 @@ prompt = f"""
 9. केवल स्क्रिप्ट दें।
 """
 
+
 response = client.chat.completions.create(
     model="openai/gpt-oss-120b",
     messages=[
@@ -168,23 +270,37 @@ response = client.chat.completions.create(
     max_tokens=700
 )
 
-script = response.choices[0].message.content.strip()
+
+script = (
+    response
+    .choices[0]
+    .message
+    .content
+    .strip()
+)
+
 
 with open(
     "script.txt",
     "w",
     encoding="utf-8"
 ) as f:
+
     f.write(script)
 
-print("Hindi script generated.")
+
+print(
+    "Hindi script generated."
+)
 
 
 # =========================================================
 # STEP 4 — HINDI VOICE
 # =========================================================
 
-print("\nSTEP 4: Generating Hindi voice...")
+print(
+    "\nSTEP 4: Generating Hindi voice..."
+)
 
 
 async def generate_voice():
@@ -205,17 +321,25 @@ asyncio.run(
     generate_voice()
 )
 
-print("Hindi voice generated.")
+
+print(
+    "Hindi voice generated."
+)
 
 
 # =========================================================
-# STEP 5 — SUBTITLES
+# STEP 5 — CREATE SUBTITLES
 # =========================================================
 
-print("\nSTEP 5: Creating subtitles...")
+print(
+    "\nSTEP 5: Creating subtitles..."
+)
 
 
-def split_text(text, words_per_line=7):
+def split_text(
+    text,
+    words_per_line=7
+):
 
     words = text.split()
 
@@ -246,16 +370,21 @@ def split_text(text, words_per_line=7):
 
 def format_time(seconds):
 
-    hours = int(seconds // 3600)
+    hours = int(
+        seconds // 3600
+    )
 
     minutes = int(
         (seconds % 3600) // 60
     )
 
-    secs = int(seconds % 60)
+    secs = int(
+        seconds % 60
+    )
 
     milliseconds = int(
-        (seconds - int(seconds)) * 1000
+        (seconds - int(seconds))
+        * 1000
     )
 
     return (
@@ -266,9 +395,13 @@ def format_time(seconds):
     )
 
 
-lines = split_text(script)
+lines = split_text(
+    script
+)
+
 
 duration_per_line = 3.5
+
 
 with open(
     "subtitles.srt",
@@ -278,7 +411,10 @@ with open(
 
     for i, line in enumerate(lines):
 
-        start = i * duration_per_line
+        start = (
+            i
+            * duration_per_line
+        )
 
         end = (
             (i + 1)
@@ -298,25 +434,35 @@ with open(
             f"{line}\n\n"
         )
 
-print("Subtitles created.")
+
+print(
+    "Subtitles created."
+)
 
 
 # =========================================================
-# STEP 6 — CREATE 3 VISUAL SCENES
+# STEP 6 — CREATE PROFESSIONAL VIDEO
 # =========================================================
 
-print("\nSTEP 6: Creating 3-scene professional video...")
+print(
+    "\nSTEP 6: Creating professional 9:16 video..."
+)
 
 
-if image_url and os.path.exists("news.jpg"):
+if (
+    image_url
+    and os.path.exists("news.jpg")
+):
 
-    print("Creating multiple visual scenes...")
+    print(
+        "Creating 3 visual scenes..."
+    )
+
 
     filter_complex = (
 
         # =================================================
         # SCENE 1
-        # Full image with slow zoom
         # =================================================
 
         "[0:v]"
@@ -337,7 +483,6 @@ if image_url and os.path.exists("news.jpg"):
 
         # =================================================
         # SCENE 2
-        # Zoomed image
         # =================================================
 
         "[0:v]"
@@ -358,7 +503,6 @@ if image_url and os.path.exists("news.jpg"):
 
         # =================================================
         # SCENE 3
-        # Different crop
         # =================================================
 
         "[0:v]"
@@ -378,7 +522,7 @@ if image_url and os.path.exists("news.jpg"):
 
 
         # =================================================
-        # JOIN THREE SCENES
+        # JOIN SCENES
         # =================================================
 
         "[scene1]"
@@ -434,41 +578,53 @@ if image_url and os.path.exists("news.jpg"):
     ffmpeg_command = [
 
         "ffmpeg",
+
         "-y",
 
         "-loop",
+
         "1",
 
         "-i",
+
         "news.jpg",
 
         "-i",
+
         "voice.mp3",
 
         "-filter_complex",
+
         filter_complex,
 
         "-map",
+
         "[final]",
 
         "-map",
+
         "1:a",
 
         "-c:v",
+
         "libx264",
 
         "-preset",
+
         "veryfast",
 
         "-c:a",
+
         "aac",
 
         "-b:a",
+
         "128k",
 
         "-shortest",
 
         "-pix_fmt",
+
         "yuv420p",
 
         OUTPUT
@@ -477,20 +633,31 @@ if image_url and os.path.exists("news.jpg"):
 
 else:
 
-    print("No image found. Creating backup video.")
+    print(
+        "No image found."
+    )
+
+    print(
+        "Creating backup video..."
+    )
+
 
     ffmpeg_command = [
 
         "ffmpeg",
+
         "-y",
 
         "-f",
+
         "lavfi",
 
         "-i",
+
         "color=c=black:s=1080x1920",
 
         "-i",
+
         "voice.mp3",
 
         "-vf",
@@ -526,20 +693,25 @@ else:
         ),
 
         "-c:v",
+
         "libx264",
 
         "-preset",
+
         "veryfast",
 
         "-c:a",
+
         "aac",
 
         "-b:a",
+
         "128k",
 
         "-shortest",
 
         "-pix_fmt",
+
         "yuv420p",
 
         OUTPUT
@@ -547,8 +719,13 @@ else:
 
 
 # =========================================================
-# RUN FFMPEG
+# STEP 7 — RUN FFMPEG
 # =========================================================
+
+print(
+    "\nSTEP 7: Rendering final video..."
+)
+
 
 subprocess.run(
     ffmpeg_command,
@@ -560,14 +737,38 @@ subprocess.run(
 # FINISHED
 # =========================================================
 
-print("\n========================================")
-print("3-SCENE NEWS VIDEO CREATED")
-print("========================================")
+print(
+    "\n========================================"
+)
 
-print("Script      : script.txt")
-print("Voice       : voice.mp3")
-print("Subtitles   : subtitles.srt")
-print("Image       : news.jpg")
-print("Final video : output.mp4")
+print(
+    "PROFESSIONAL NEWS VIDEO CREATED"
+)
 
-print("\nSUCCESS!")
+print(
+    "========================================"
+)
+
+print(
+    "Script      : script.txt"
+)
+
+print(
+    "Voice       : voice.mp3"
+)
+
+print(
+    "Subtitles   : subtitles.srt"
+)
+
+print(
+    "Image       : news.jpg"
+)
+
+print(
+    "Final video : output.mp4"
+)
+
+print(
+    "\nSUCCESS!"
+)
