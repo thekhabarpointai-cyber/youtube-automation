@@ -1,20 +1,24 @@
-from pathlib import Path
-import subprocess
+import urllib.request
+import xml.etree.ElementTree as ET
 
-output = Path("output.mp4")
+RSS_URL = "https://news.google.com/rss?hl=en-IN&gl=IN&ceid=IN:en"
 
-# Create a 5-second test video
-command = [
-    "ffmpeg",
-    "-y",
-    "-f", "lavfi",
-    "-i", "color=c=black:s=1080x1920:d=5",
-    "-vf", "drawtext=text='YouTube Automation Test':fontcolor=white:fontsize=60:x=(w-text_w)/2:y=(h-text_h)/2",
-    "-c:v", "libx264",
-    "-pix_fmt", "yuv420p",
-    str(output)
-]
+print("Fetching latest Indian news...")
 
-subprocess.run(command, check=True)
+data = urllib.request.urlopen(RSS_URL, timeout=30).read()
 
-print(f"Video created: {output}")
+root = ET.fromstring(data)
+
+items = root.findall(".//item")
+
+if not items:
+    print("No news found.")
+    raise SystemExit(1)
+
+print("\nLatest news:\n")
+
+for i, item in enumerate(items[:5], start=1):
+    title = item.findtext("title", default="No title")
+    print(f"{i}. {title}")
+
+print("\nNews collection successful!")
