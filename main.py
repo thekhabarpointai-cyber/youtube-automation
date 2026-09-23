@@ -1,4 +1,3 @@
-```python
 import os
 import re
 import html
@@ -24,93 +23,79 @@ RSS_URL = (
     "&ceid=IN:en"
 )
 
-HF_TOKEN = os.environ.get("HF_TOKEN")
+HF_TOKEN = os.getenv("HF_TOKEN")
 
 if not HF_TOKEN:
     raise SystemExit("ERROR: HF_TOKEN secret is missing.")
 
 VOICE = "hi-IN-MadhurNeural"
-
 CHANNEL_NAME = "digital info wallah"
 
 OUTPUT_DIR = Path("generated_video")
-
-OUTPUT_DIR.mkdir(exist_ok=True)
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 SCRIPT_FILE = OUTPUT_DIR / "script.txt"
 VOICE_FILE = OUTPUT_DIR / "voice.mp3"
 IMAGE_FILE = OUTPUT_DIR / "news.jpg"
-SUBTITLE_FILE = OUTPUT_DIR / "subtitles.srt"
 VIDEO_FILE = OUTPUT_DIR / "news_video.mp4"
 
 
 # ============================================================
-# STEP 1 — FETCH NEWS
+# FETCH NEWS
 # ============================================================
 
-print("\n========================================")
-print("STEP 1 — FETCHING NEWS")
-print("========================================\n")
+print("========================================")
+print("1. FETCHING NEWS")
+print("========================================")
 
-
-def fetch_news():
-
-    headers = {
-        "User-Agent": (
-            "Mozilla/5.0 "
-            "(Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 "
-            "(KHTML, like Gecko) "
-            "Chrome/120.0 Safari/537.36"
-        )
-    }
-
-    request = urllib.request.Request(
-        RSS_URL,
-        headers=headers
+headers = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 "
+        "(KHTML, like Gecko) "
+        "Chrome/120.0 Safari/537.36"
     )
+}
 
-    for attempt in range(3):
+request = urllib.request.Request(
+    RSS_URL,
+    headers=headers
+)
 
-        try:
+data = None
 
-            print(f"Attempt {attempt + 1}/3")
+for attempt in range(3):
 
-            with urllib.request.urlopen(
-                request,
-                timeout=30
-            ) as response:
+    try:
+        print(f"Attempt {attempt + 1}/3")
 
-                data = response.read()
+        with urllib.request.urlopen(
+            request,
+            timeout=30
+        ) as response:
+            data = response.read()
 
-            print("Google News connected.")
+        break
 
-            return data
+    except Exception as error:
 
-        except Exception as error:
+        print(error)
 
-            print("News request failed:")
-            print(error)
-
-            if attempt < 2:
-                print("Waiting 10 seconds...")
-                time.sleep(10)
-
-    raise SystemExit(
-        "ERROR: Could not fetch Google News."
-    )
+        if attempt < 2:
+            time.sleep(10)
 
 
-data = fetch_news()
+if data is None:
+    raise SystemExit("ERROR: Could not download Google News RSS.")
+
 
 root = ET.fromstring(data)
 
 items = root.findall(".//item")
 
 if not items:
-    raise SystemExit(
-        "ERROR: No news articles found."
-    )
+    raise SystemExit("ERROR: No news articles found.")
+
 
 item = items[0]
 
@@ -128,7 +113,6 @@ description = html.unescape(
     )
 )
 
-# Remove HTML tags
 description = re.sub(
     r"<[^>]+>",
     " ",
@@ -141,18 +125,20 @@ description = re.sub(
     description
 ).strip()
 
-print("\nNEWS TITLE:")
+
+print()
+print("NEWS:")
 print(title)
 
 
 # ============================================================
-# STEP 2 — FIND IMAGE
+# FIND IMAGE
 # ============================================================
 
-print("\n========================================")
-print("STEP 2 — FINDING NEWS IMAGE")
-print("========================================\n")
-
+print()
+print("========================================")
+print("2. FINDING NEWS IMAGE")
+print("========================================")
 
 image_url = None
 
@@ -172,25 +158,11 @@ for child in item:
             break
 
 
-if not image_url:
-
-    match = re.search(
-        r'https?://[^"\']+\.(?:jpg|jpeg|png|webp)',
-        description,
-        re.IGNORECASE
-    )
-
-    if match:
-        image_url = match.group(0)
-
-
 if image_url:
 
     try:
 
-        print("Downloading news image...")
-
-        request = urllib.request.Request(
+        image_request = urllib.request.Request(
             image_url,
             headers={
                 "User-Agent": "Mozilla/5.0"
@@ -198,7 +170,7 @@ if image_url:
         )
 
         with urllib.request.urlopen(
-            request,
+            image_request,
             timeout=30
         ) as response:
 
@@ -211,7 +183,7 @@ if image_url:
 
             file.write(image_data)
 
-        print("Image downloaded.")
+        print("News image downloaded.")
 
     except Exception as error:
 
@@ -222,51 +194,46 @@ if image_url:
 
 
 if not image_url:
-
-    print("No usable news image found.")
+    print("No news image available.")
 
 
 # ============================================================
-# STEP 3 — GENERATE HINDI SCRIPT
+# GENERATE HINDI SCRIPT
 # ============================================================
 
-print("\n========================================")
-print("STEP 3 — GENERATING HINDI SCRIPT")
-print("========================================\n")
-
+print()
+print("========================================")
+print("3. GENERATING HINDI SCRIPT")
+print("========================================")
 
 client = InferenceClient(
     api_key=HF_TOKEN,
     provider="auto"
 )
 
-
 prompt = f"""
-आप एक प्रोफेशनल भारतीय हिंदी न्यूज़ एंकर हैं।
+आप एक प्रोफेशनल हिंदी न्यूज़ एंकर हैं।
 
-नीचे दी गई खबर के आधार पर लगभग 45 से 60 सेकंड
-की हिंदी न्यूज़ स्क्रिप्ट लिखें।
+इस खबर के आधार पर लगभग 45 से 60 सेकंड की
+सरल और आकर्षक हिंदी न्यूज़ स्क्रिप्ट लिखें।
 
-खबर का शीर्षक:
+शीर्षक:
 {title}
 
-खबर की उपलब्ध जानकारी:
+जानकारी:
 {description}
 
 नियम:
 
-1. शुरुआत "नमस्कार दोस्तों!" से करें।
-2. खबर का मुख्य विषय साफ बताएं।
-3. केवल दी गई जानकारी का इस्तेमाल करें।
-4. कोई तथ्य खुद से न बनाएं।
-5. आसान और बोलने वाली हिंदी लिखें।
-6. स्क्रिप्ट लगभग 45 से 60 सेकंड की हो।
-7. अंत में "ऐसी ही खबरों के लिए चैनल को सब्सक्राइब करें" कहें।
-8. Emoji का इस्तेमाल न करें।
-9. कोई heading या explanation न दें।
-10. केवल पूरी न्यूज़ स्क्रिप्ट दें।
+- शुरुआत "नमस्कार दोस्तों!" से करें।
+- केवल दी गई जानकारी का इस्तेमाल करें।
+- कोई तथ्य खुद से न बनाएं।
+- आसान बोलने वाली हिंदी लिखें।
+- स्क्रिप्ट 45 से 60 सेकंड की रखें।
+- अंत में चैनल को सब्सक्राइब करने के लिए कहें।
+- Emoji न इस्तेमाल करें।
+- केवल स्क्रिप्ट लिखें।
 """
-
 
 response = client.chat.completions.create(
     model="openai/gpt-oss-120b",
@@ -279,7 +246,6 @@ response = client.chat.completions.create(
     max_tokens=700
 )
 
-
 script = (
     response
     .choices[0]
@@ -287,7 +253,6 @@ script = (
     .content
     .strip()
 )
-
 
 with open(
     SCRIPT_FILE,
@@ -297,241 +262,114 @@ with open(
 
     file.write(script)
 
-
-print("Hindi script created.")
-
-print("\nSCRIPT:")
+print()
+print("SCRIPT CREATED:")
 print(script)
 
 
 # ============================================================
-# STEP 4 — GENERATE HINDI VOICE
+# GENERATE HINDI VOICE
 # ============================================================
 
-print("\n========================================")
-print("STEP 4 — GENERATING HINDI VOICE")
-print("========================================\n")
+print()
+print("========================================")
+print("4. GENERATING HINDI VOICE")
+print("========================================")
 
 
-async def generate_voice():
+async def create_voice():
 
-    communicator = edge_tts.Communicate(
+    voice = edge_tts.Communicate(
         script,
-        VOICE,
-        rate="+0%",
-        volume="+0%"
+        VOICE
     )
 
-    await communicator.save(
+    await voice.save(
         str(VOICE_FILE)
     )
 
 
 asyncio.run(
-    generate_voice()
+    create_voice()
 )
 
-
-print("Hindi voice created.")
+print("Voice created.")
 
 
 # ============================================================
-# STEP 5 — GET AUDIO DURATION
+# GET AUDIO DURATION
 # ============================================================
 
-print("\n========================================")
-print("STEP 5 — CHECKING AUDIO DURATION")
-print("========================================\n")
+print()
+print("========================================")
+print("5. CHECKING AUDIO LENGTH")
+print("========================================")
 
-
-duration_command = [
-    "ffprobe",
-    "-v",
-    "error",
-    "-show_entries",
-    "format=duration",
-    "-of",
-    "default=noprint_wrappers=1:nokey=1",
-    str(VOICE_FILE)
-]
-
-
-duration_result = subprocess.run(
-    duration_command,
+probe = subprocess.run(
+    [
+        "ffprobe",
+        "-v",
+        "error",
+        "-show_entries",
+        "format=duration",
+        "-of",
+        "default=noprint_wrappers=1:nokey=1",
+        str(VOICE_FILE)
+    ],
     capture_output=True,
     text=True,
     check=True
 )
 
-
-audio_duration = float(
-    duration_result.stdout.strip()
+duration = float(
+    probe.stdout.strip()
 )
 
 print(
-    f"Voice duration: {audio_duration:.2f} seconds"
+    f"Audio duration: {duration:.2f} seconds"
 )
 
 
 # ============================================================
-# STEP 6 — CREATE SUBTITLES
+# CREATE VIDEO
 # ============================================================
 
-print("\n========================================")
-print("STEP 6 — CREATING SUBTITLES")
-print("========================================\n")
+print()
+print("========================================")
+print("6. CREATING 9:16 VIDEO")
+print("========================================")
 
 
-def split_text(text, words_per_line=8):
+if IMAGE_FILE.exists():
 
-    words = text.split()
+    print("Using news image.")
 
-    lines = []
-
-    current = []
-
-    for word in words:
-
-        current.append(word)
-
-        if len(current) >= words_per_line:
-
-            lines.append(
-                " ".join(current)
-            )
-
-            current = []
-
-    if current:
-        lines.append(
-            " ".join(current)
-        )
-
-    return lines
-
-
-def format_time(seconds):
-
-    hours = int(seconds // 3600)
-
-    minutes = int(
-        (seconds % 3600) // 60
-    )
-
-    secs = int(
-        seconds % 60
-    )
-
-    milliseconds = int(
-        (seconds - int(seconds)) * 1000
-    )
-
-    return (
-        f"{hours:02d}:"
-        f"{minutes:02d}:"
-        f"{secs:02d},"
-        f"{milliseconds:03d}"
-    )
-
-
-lines = split_text(script)
-
-line_duration = audio_duration / max(
-    len(lines),
-    1
-)
-
-
-with open(
-    SUBTITLE_FILE,
-    "w",
-    encoding="utf-8"
-) as file:
-
-    for index, line in enumerate(lines):
-
-        start = index * line_duration
-
-        end = min(
-            (index + 1) * line_duration,
-            audio_duration
-        )
-
-        file.write(
-            f"{index + 1}\n"
-        )
-
-        file.write(
-            f"{format_time(start)} --> "
-            f"{format_time(end)}\n"
-        )
-
-        file.write(
-            f"{line}\n\n"
-        )
-
-
-print("Subtitles created.")
-
-
-# ============================================================
-# STEP 7 — CREATE VIDEO
-# ============================================================
-
-print("\n========================================")
-print("STEP 7 — CREATING 9:16 VIDEO")
-print("========================================\n")
-
-
-if image_url and IMAGE_FILE.exists():
-
-    video_input = str(IMAGE_FILE)
-
-    filter_complex = (
-        "[0:v]"
+    video_filter = (
         "scale=1080:1920:"
         "force_original_aspect_ratio=increase,"
         "crop=1080:1920,"
-        "zoompan="
-        "z='min(zoom+0.0003,1.12)':"
-        "x='iw/2-(iw/zoom/2)':"
-        "y='ih/2-(ih/zoom/2)':"
-        "d=1:"
-        "s=1080x1920:"
-        "fps=30,"
-        f"trim=duration={audio_duration},"
-        "setpts=PTS-STARTPTS,"
+        "setsar=1,"
         "drawbox="
-        "x=0:y=0:w=1080:h=210:"
-        "color=black@0.78:t=fill,"
+        "x=0:y=0:w=1080:h=190:"
+        "color=black@0.75:t=fill,"
         "drawtext="
         "text='BREAKING NEWS':"
         "fontcolor=white:"
-        "fontsize=64:"
+        "fontsize=60:"
         "x=(w-text_w)/2:"
-        "y=65,"
+        "y=55,"
         "drawbox="
-        "x=0:y=1660:w=1080:h=260:"
-        "color=black@0.82:t=fill,"
+        "x=0:y=1680:w=1080:h=240:"
+        "color=black@0.80:t=fill,"
         "drawtext="
-        "text='digital info wallah':"
+        f"text='{CHANNEL_NAME}':"
         "fontcolor=white:"
         "fontsize=42:"
         "x=(w-text_w)/2:"
-        "y=1690,"
-        "subtitles="
-        f"{SUBTITLE_FILE}:"
-        "force_style="
-        "'FontSize=22,"
-        "PrimaryColour=&H00FFFFFF,"
-        "OutlineColour=&H00000000,"
-        "Outline=2,"
-        "Alignment=2,"
-        "MarginV=110'"
+        "y=1725"
     )
 
-    ffmpeg_command = [
-
+    command = [
         "ffmpeg",
         "-y",
 
@@ -539,28 +377,31 @@ if image_url and IMAGE_FILE.exists():
         "1",
 
         "-i",
-        video_input,
+        str(IMAGE_FILE),
 
         "-i",
         str(VOICE_FILE),
 
-        "-filter_complex",
-        filter_complex,
-
-        "-map",
-        "0:v",
-
-        "-map",
-        "1:a",
+        "-vf",
+        video_filter,
 
         "-t",
-        str(audio_duration),
+        str(duration),
+
+        "-map",
+        "0:v:0",
+
+        "-map",
+        "1:a:0",
 
         "-c:v",
         "libx264",
 
         "-preset",
         "veryfast",
+
+        "-crf",
+        "23",
 
         "-c:a",
         "aac",
@@ -578,10 +419,28 @@ if image_url and IMAGE_FILE.exists():
 
 else:
 
+    print("No image found.")
     print("Using black background.")
 
-    ffmpeg_command = [
+    video_filter = (
+        "drawbox="
+        "x=0:y=0:w=1080:h=190:"
+        "color=black@0.8:t=fill,"
+        "drawtext="
+        "text='BREAKING NEWS':"
+        "fontcolor=white:"
+        "fontsize=60:"
+        "x=(w-text_w)/2:"
+        "y=55,"
+        "drawtext="
+        f"text='{CHANNEL_NAME}':"
+        "fontcolor=white:"
+        "fontsize=42:"
+        "x=(w-text_w)/2:"
+        "y=1725"
+    )
 
+    command = [
         "ffmpeg",
         "-y",
 
@@ -595,48 +454,25 @@ else:
         str(VOICE_FILE),
 
         "-vf",
-
-        (
-            "drawbox="
-            "x=0:y=0:w=1080:h=210:"
-            "color=black@0.8:t=fill,"
-            "drawtext="
-            "text='BREAKING NEWS':"
-            "fontcolor=white:"
-            "fontsize=64:"
-            "x=(w-text_w)/2:"
-            "y=65,"
-            "drawtext="
-            "text='digital info wallah':"
-            "fontcolor=white:"
-            "fontsize=42:"
-            "x=(w-text_w)/2:"
-            "y=1690,"
-            "subtitles="
-            f"{SUBTITLE_FILE}:"
-            "force_style="
-            "'FontSize=22,"
-            "PrimaryColour=&H00FFFFFF,"
-            "OutlineColour=&H00000000,"
-            "Outline=2,"
-            "Alignment=2,"
-            "MarginV=110'"
-        ),
+        video_filter,
 
         "-t",
-        str(audio_duration),
+        str(duration),
 
         "-map",
-        "0:v",
+        "0:v:0",
 
         "-map",
-        "1:a",
+        "1:a:0",
 
         "-c:v",
         "libx264",
 
         "-preset",
         "veryfast",
+
+        "-crf",
+        "23",
 
         "-c:a",
         "aac",
@@ -653,79 +489,56 @@ else:
     ]
 
 
-# ============================================================
-# STEP 8 — RENDER
-# ============================================================
-
 print("Rendering video...")
 
 subprocess.run(
-    ffmpeg_command,
+    command,
     check=True
 )
 
 
 # ============================================================
-# STEP 9 — VERIFY VIDEO
+# VERIFY
 # ============================================================
 
-print("\n========================================")
-print("VERIFYING VIDEO")
-print("========================================\n")
+print()
+print("========================================")
+print("7. VERIFYING VIDEO")
+print("========================================")
 
 
 if not VIDEO_FILE.exists():
-
     raise SystemExit(
         "ERROR: Video was not created."
     )
 
 
-video_size = VIDEO_FILE.stat().st_size
+size = VIDEO_FILE.stat().st_size
 
-if video_size < 10000:
+print(
+    f"Video created: {VIDEO_FILE}"
+)
 
+print(
+    f"Video size: {size / 1024 / 1024:.2f} MB"
+)
+
+if size < 10000:
     raise SystemExit(
         "ERROR: Video file is too small."
     )
 
 
-print(
-    f"Video created successfully."
-)
-
-print(
-    f"Video file: {VIDEO_FILE}"
-)
-
-print(
-    f"Video size: {video_size / (1024 * 1024):.2f} MB"
-)
-
-
-# ============================================================
-# FINISHED
-# ============================================================
-
-print("\n========================================")
-print("        SUCCESS")
+print()
+print("========================================")
+print("SUCCESS")
 print("========================================")
 
-print(
-    "\nGenerated files:"
-)
+print()
+print("Generated files:")
 
 for file in OUTPUT_DIR.iterdir():
 
     print(
-        f" - {file.name}"
+        file
     )
-
-print(
-    "\nYour video is ready:"
-)
-
-print(
-    str(VIDEO_FILE)
-)
-```
