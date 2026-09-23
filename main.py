@@ -28,63 +28,48 @@ VOICE = "hi-IN-MadhurNeural"
 # STEP 1 — FETCH NEWS
 # =========================================================
 
-print("========================================")
-print("STEP 1: FETCHING LATEST INDIAN NEWS")
-print("========================================")
+print("STEP 1: Fetching latest Indian news...")
 
-try:
-    data = urllib.request.urlopen(
-        RSS_URL,
-        timeout=30
-    ).read()
+data = urllib.request.urlopen(
+    RSS_URL,
+    timeout=30
+).read()
 
-    root = ET.fromstring(data)
-
-except Exception as e:
-    raise SystemExit(f"ERROR: Could not fetch news: {e}")
-
+root = ET.fromstring(data)
 
 items = root.findall(".//item")
 
 if not items:
     raise SystemExit("ERROR: No news found.")
 
-
 item = items[0]
 
-title = item.findtext(
-    "title",
-    default="आज की बड़ी खबर"
+title = html.unescape(
+    item.findtext(
+        "title",
+        default="आज की बड़ी खबर"
+    )
 )
 
-description = item.findtext(
-    "description",
-    default=""
+description = html.unescape(
+    item.findtext(
+        "description",
+        default=""
+    )
 )
 
-link = item.findtext(
-    "link",
-    default=""
-)
-
-title = html.unescape(title)
-description = html.unescape(description)
-
-print("\nLatest news:")
+print("News:")
 print(title)
 
 
 # =========================================================
-# STEP 2 — FIND IMAGE URL
+# STEP 2 — FIND NEWS IMAGE
 # =========================================================
 
-print("\n========================================")
-print("STEP 2: FINDING NEWS IMAGE")
-print("========================================")
+print("\nSTEP 2: Finding news image...")
 
 image_url = None
 
-# Look for media:content / media:thumbnail
 for child in item:
 
     tag = child.tag.lower()
@@ -98,7 +83,6 @@ for child in item:
             break
 
 
-# Also search the description for an image URL
 if not image_url:
 
     image_match = re.search(
@@ -113,9 +97,6 @@ if not image_url:
 
 if image_url:
 
-    print("News image found:")
-    print(image_url)
-
     try:
 
         urllib.request.urlretrieve(
@@ -123,32 +104,30 @@ if image_url:
             "news.jpg"
         )
 
-        print("News image downloaded successfully.")
+        print("News image downloaded.")
 
     except Exception as e:
 
-        print("Could not download RSS image.")
+        print("Image download failed:")
         print(e)
+
         image_url = None
 
 else:
 
-    print("No image was found in RSS.")
+    print("No news image found.")
 
 
 # =========================================================
-# STEP 3 — GENERATE AI HINDI SCRIPT
+# STEP 3 — AI NEWS SCRIPT
 # =========================================================
 
-print("\n========================================")
-print("STEP 3: GENERATING HINDI SCRIPT")
-print("========================================")
+print("\nSTEP 3: Generating Hindi news script...")
 
 client = InferenceClient(
     api_key=HF_TOKEN,
     provider="auto"
 )
-
 
 prompt = f"""
 आप एक प्रोफेशनल भारतीय हिंदी न्यूज़ एंकर हैं।
@@ -162,68 +141,47 @@ prompt = f"""
 उपलब्ध जानकारी:
 {description}
 
-निर्देश:
+नियम:
 
 1. शुरुआत "नमस्कार दोस्तों!" से करें।
-2. खबर का मुख्य विषय बताएं।
-3. केवल उपलब्ध जानकारी का इस्तेमाल करें।
+2. खबर का मुख्य विषय स्पष्ट बताएं।
+3. केवल उपलब्ध जानकारी का उपयोग करें।
 4. कोई तथ्य खुद से न बनाएं।
 5. आसान बोलने वाली हिंदी इस्तेमाल करें।
-6. स्क्रिप्ट 45-60 सेकंड की हो।
-7. अंत में दर्शकों को चैनल सब्सक्राइब करने के लिए कहें।
+6. स्क्रिप्ट 45 से 60 सेकंड की हो।
+7. अंत में चैनल को सब्सक्राइब करने के लिए कहें।
 8. Emoji का इस्तेमाल न करें।
 9. केवल स्क्रिप्ट दें।
 """
 
+response = client.chat.completions.create(
+    model="openai/gpt-oss-120b",
+    messages=[
+        {
+            "role": "user",
+            "content": prompt
+        }
+    ],
+    max_tokens=700
+)
 
-try:
-
-    response = client.chat.completions.create(
-
-        model="openai/gpt-oss-120b",
-
-        messages=[
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ],
-
-        max_tokens=700
-    )
-
-    script = response.choices[0].message.content.strip()
-
-except Exception as e:
-
-    raise SystemExit(
-        f"ERROR: Hugging Face failed: {e}"
-    )
-
-
-print("\n========================================")
-print("AI GENERATED HINDI SCRIPT")
-print("========================================")
-
-print(script)
-
+script = response.choices[0].message.content.strip()
 
 with open(
     "script.txt",
     "w",
     encoding="utf-8"
 ) as file:
-
     file.write(script)
+
+print("Hindi script generated.")
 
 
 # =========================================================
 # STEP 4 — GENERATE HINDI VOICE
 # =========================================================
 
-print("\n========================================")
-print("STEP 4: GENERATING HINDI VOICE")
-print("========================================")
+print("\nSTEP 4: Generating Hindi voice...")
 
 
 async def generate_voice():
@@ -240,37 +198,129 @@ async def generate_voice():
     )
 
 
-try:
+asyncio.run(
+    generate_voice()
+)
 
-    asyncio.run(
-        generate_voice()
-    )
-
-except Exception as e:
-
-    raise SystemExit(
-        f"ERROR: Voice generation failed: {e}"
-    )
-
-
-print("Hindi voice created successfully.")
+print("Hindi voice generated.")
 
 
 # =========================================================
-# STEP 5 — CREATE VIDEO
+# STEP 5 — CREATE SUBTITLE FILE
 # =========================================================
 
-print("\n========================================")
-print("STEP 5: CREATING 9:16 NEWS VIDEO")
-print("========================================")
+print("\nSTEP 5: Creating Hindi subtitles...")
 
 
-OUTPUT_VIDEO = "output.mp4"
+def split_text(text, words_per_line=8):
+
+    words = text.split()
+
+    lines = []
+
+    current = []
+
+    for word in words:
+
+        current.append(word)
+
+        if len(current) >= words_per_line:
+
+            lines.append(
+                " ".join(current)
+            )
+
+            current = []
+
+    if current:
+
+        lines.append(
+            " ".join(current)
+        )
+
+    return lines
 
 
-if image_url and os.path.exists("news.jpg"):
+subtitle_lines = split_text(
+    script,
+    words_per_line=8
+)
 
-    print("Creating video with news image.")
+
+def format_time(seconds):
+
+    hours = int(seconds // 3600)
+
+    minutes = int(
+        (seconds % 3600) // 60
+    )
+
+    secs = int(
+        seconds % 60
+    )
+
+    milliseconds = int(
+        (seconds - int(seconds)) * 1000
+    )
+
+    return (
+        f"{hours:02d}:"
+        f"{minutes:02d}:"
+        f"{secs:02d},"
+        f"{milliseconds:03d}"
+    )
+
+
+# Approximate timing based on number of lines
+duration_per_line = 3.5
+
+
+with open(
+    "subtitles.srt",
+    "w",
+    encoding="utf-8"
+) as subtitle_file:
+
+    for i, line in enumerate(
+        subtitle_lines
+    ):
+
+        start = i * duration_per_line
+
+        end = (
+            (i + 1)
+            * duration_per_line
+        )
+
+        subtitle_file.write(
+            f"{i + 1}\n"
+        )
+
+        subtitle_file.write(
+            f"{format_time(start)} --> "
+            f"{format_time(end)}\n"
+        )
+
+        subtitle_file.write(
+            f"{line}\n\n"
+        )
+
+
+print("Hindi subtitles created.")
+
+
+# =========================================================
+# STEP 6 — CREATE FINAL 9:16 VIDEO
+# =========================================================
+
+print("\nSTEP 6: Creating final 9:16 video...")
+
+
+if image_url and os.path.exists(
+    "news.jpg"
+):
+
+    video_input = "news.jpg"
 
     ffmpeg_command = [
 
@@ -281,7 +331,7 @@ if image_url and os.path.exists("news.jpg"):
         "1",
 
         "-i",
-        "news.jpg",
+        video_input,
 
         "-i",
         "voice.mp3",
@@ -289,16 +339,28 @@ if image_url and os.path.exists("news.jpg"):
         "-vf",
 
         (
-            "scale=1080:1920:force_original_aspect_ratio=increase,"
+            "scale=1080:1920:"
+            "force_original_aspect_ratio=increase,"
             "crop=1080:1920,"
-            "drawbox=x=0:y=0:w=1080:h=230:color=black@0.75:t=fill,"
-            "drawbox=x=0:y=1690:w=1080:h=230:color=black@0.75:t=fill,"
+            "drawbox="
+            "x=0:y=0:"
+            "w=1080:h=220:"
+            "color=black@0.75:t=fill,"
             "drawtext="
             "text='BREAKING NEWS':"
             "fontcolor=white:"
             "fontsize=70:"
             "x=(w-text_w)/2:"
-            "y=75"
+            "y=70,"
+            "subtitles=subtitles.srt:"
+            "force_style="
+            "'FontName=DejaVu Sans,"
+            "FontSize=22,"
+            "PrimaryColour=&H00FFFFFF,"
+            "OutlineColour=&H00000000,"
+            "Outline=2,"
+            "Alignment=2,"
+            "MarginV=180'"
         ),
 
         "-c:v",
@@ -318,12 +380,15 @@ if image_url and os.path.exists("news.jpg"):
         "-pix_fmt",
         "yuv420p",
 
-        OUTPUT_VIDEO
+        "output.mp4"
     ]
 
 else:
 
-    print("Creating video with black background.")
+    print(
+        "No image available. "
+        "Using black background."
+    )
 
     ffmpeg_command = [
 
@@ -347,7 +412,15 @@ else:
             "fontcolor=white:"
             "fontsize=90:"
             "x=(w-text_w)/2:"
-            "y=500"
+            "y=400,"
+            "subtitles=subtitles.srt:"
+            "force_style="
+            "'FontSize=22,"
+            "PrimaryColour=&H00FFFFFF,"
+            "OutlineColour=&H00000000,"
+            "Outline=2,"
+            "Alignment=2,"
+            "MarginV=180'"
         ),
 
         "-c:v",
@@ -367,36 +440,27 @@ else:
         "-pix_fmt",
         "yuv420p",
 
-        OUTPUT_VIDEO
+        "output.mp4"
     ]
 
 
-try:
-
-    subprocess.run(
-        ffmpeg_command,
-        check=True
-    )
-
-except Exception as e:
-
-    raise SystemExit(
-        f"ERROR: FFmpeg failed: {e}"
-    )
+subprocess.run(
+    ffmpeg_command,
+    check=True
+)
 
 
 # =========================================================
 # FINISHED
 # =========================================================
 
-print("\n========================================")
+print("\n================================")
 print("AUTOMATION COMPLETED")
-print("========================================")
+print("================================")
 
-print(f"News       : {title}")
-print("Script     : script.txt")
-print("Voice      : voice.mp3")
-print("Image      : news.jpg")
-print("Video      : output.mp4")
+print("script.txt       created")
+print("voice.mp3        created")
+print("subtitles.srt    created")
+print("output.mp4       created")
 
-print("\nSUCCESS!")
+print("\n9:16 Hindi news video with captions is ready!")
