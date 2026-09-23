@@ -1,5 +1,8 @@
 import urllib.request
 import xml.etree.ElementTree as ET
+import subprocess
+import re
+import os
 
 RSS_URL = "https://news.google.com/rss?hl=en-IN&gl=IN&ceid=IN:en"
 
@@ -30,11 +33,21 @@ script = f"""
 धन्यवाद!
 """
 
-print("\n===== GENERATED HINDI SCRIPT =====\n")
-print(script)
-
 with open("script.txt", "w", encoding="utf-8") as file:
     file.write(script)
 
-print("==================================")
 print("Hindi script created successfully!")
+
+# Remove unsupported characters for the first audio test
+safe_text = re.sub(r"[^\x00-\x7F]+", " ", script)
+safe_text = " ".join(safe_text.split())
+
+# Generate temporary speech using espeak
+subprocess.run([
+    "espeak",
+    "-w",
+    "voice.wav",
+    safe_text
+], check=True)
+
+print("Voice generated successfully!")
