@@ -1,38 +1,71 @@
 import os
 import urllib.request
+import urllib.parse
 import xml.etree.ElementTree as ET
 import asyncio
 import subprocess
 import html
 import re
 import time
+from pathlib import Path
 
 from huggingface_hub import InferenceClient
 import edge_tts
 
 
-# =========================================================
+# ============================================================
 # SETTINGS
-# =========================================================
+# ============================================================
 
-RSS_URL = "https://news.google.com/rss?hl=en-IN&gl=IN&ceid=IN:en"
+RSS_URL = (
+    "https://news.google.com/rss"
+    "?hl=en-IN"
+    "&gl=IN"
+    "&ceid=IN:en"
+)
 
 HF_TOKEN = os.environ.get("HF_TOKEN")
 
 if not HF_TOKEN:
-    raise SystemExit("ERROR: HF_TOKEN was not found.")
+    raise SystemExit(
+        "ERROR: HF_TOKEN GitHub Secret was not found."
+    )
 
 VOICE = "hi-IN-MadhurNeural"
+
 CHANNEL_NAME = "digital info wallah"
 
-OUTPUT = "output.mp4"
+OUTPUT_DIR = Path("generated_video")
+
+OUTPUT_VIDEO = OUTPUT_DIR / "news_video.mp4"
+
+IMAGE_FILE = OUTPUT_DIR / "news.jpg"
+
+VOICE_FILE = OUTPUT_DIR / "voice.mp3"
+
+SCRIPT_FILE = OUTPUT_DIR / "script.txt"
+
+SUBTITLE_FILE = OUTPUT_DIR / "subtitles.srt"
 
 
-# =========================================================
-# STEP 1 — FETCH NEWS WITH RETRIES
-# =========================================================
+# ============================================================
+# CREATE OUTPUT FOLDER
+# ============================================================
 
-print("STEP 1: Fetching latest Indian news...")
+OUTPUT_DIR.mkdir(
+    exist_ok=True
+)
+
+
+# ============================================================
+# STEP 1 — FETCH NEWS
+# ============================================================
+
+print()
+print("==============================================")
+print("STEP 1 — FETCHING LATEST INDIAN NEWS")
+print("==============================================")
+print()
 
 
 def fetch_news():
@@ -57,8 +90,7 @@ def fetch_news():
         try:
 
             print(
-                f"Trying Google News RSS "
-                f"(attempt {attempt + 1}/3)..."
+                f"Attempt {attempt + 1}/3..."
             )
 
             response = urllib.request.urlopen(
@@ -68,14 +100,16 @@ def fetch_news():
 
             data = response.read()
 
-            print("Google News RSS connected.")
+            print(
+                "Google News RSS connected."
+            )
 
             return data
 
         except Exception as e:
 
             print(
-                f"Attempt {attempt + 1} failed:"
+                "News request failed:"
             )
 
             print(e)
@@ -83,14 +117,13 @@ def fetch_news():
             if attempt < 2:
 
                 print(
-                    "Waiting 10 seconds before retry..."
+                    "Waiting 10 seconds..."
                 )
 
                 time.sleep(10)
 
     raise SystemExit(
-        "ERROR: Google News RSS unavailable "
-        "after 3 attempts."
+        "ERROR: Could not fetch Google News."
     )
 
 
@@ -101,7 +134,10 @@ root = ET.fromstring(data)
 items = root.findall(".//item")
 
 if not items:
-    raise SystemExit("ERROR: No news found.")
+
+    raise SystemExit(
+        "ERROR: No news articles found."
+    )
 
 
 item = items[0]
@@ -123,20 +159,26 @@ description = html.unescape(
 )
 
 
-print("\nNEWS:")
+print()
+print("NEWS TITLE:")
 print(title)
 
 
-# =========================================================
+# ============================================================
 # STEP 2 — FIND NEWS IMAGE
-# =========================================================
+# ============================================================
 
-print("\nSTEP 2: Finding news image...")
+print()
+print("==============================================")
+print("STEP 2 — FINDING NEWS IMAGE")
+print("==============================================")
+print()
 
 
 image_url = None
 
 
+# Try RSS media fields
 for child in item:
 
     tag = child.tag.lower()
@@ -146,7 +188,9 @@ for child in item:
         or "thumbnail" in tag
     ):
 
-        url = child.attrib.get("url")
+        url = child.attrib.get(
+            "url"
+        )
 
         if url:
 
@@ -155,17 +199,18 @@ for child in item:
             break
 
 
+# Try image URL inside description
 if not image_url:
 
-    image_match = re.search(
+    match = re.search(
         r'https?://[^"\']+\.(?:jpg|jpeg|png|webp)',
         description,
         re.IGNORECASE
     )
 
-    if image_match:
+    if match:
 
-        image_url = image_match.group(0)
+        image_url = match.group(0)
 
 
 if image_url:
@@ -179,7 +224,8 @@ if image_url:
         image_request = urllib.request.Request(
             image_url,
             headers={
-                "User-Agent": "Mozilla/5.0"
+                "User-Agent":
+                    "Mozilla/5.0"
             }
         )
 
@@ -190,15 +236,19 @@ if image_url:
 
             image_data = response.read()
 
-        with open(
-            "news.jpg",
-            "wb"
-        ) as f:
 
-            f.write(image_data)
+        with open(
+            IMAGE_FILE,
+            "wb"
+        ) as file:
+
+            file.write(
+                image_data
+            )
+
 
         print(
-            "News image downloaded successfully."
+            "News image downloaded."
         )
 
     except Exception as e:
@@ -218,13 +268,15 @@ else:
     )
 
 
-# =========================================================
-# STEP 3 — GENERATE AI HINDI SCRIPT
-# =========================================================
+# ============================================================
+# STEP 3 — GENERATE HINDI SCRIPT
+# ============================================================
 
-print(
-    "\nSTEP 3: Generating Hindi news script..."
-)
+print()
+print("==============================================")
+print("STEP 3 — GENERATING HINDI SCRIPT")
+print("==============================================")
+print()
 
 
 client = InferenceClient(
@@ -236,13 +288,13 @@ client = InferenceClient(
 prompt = f"""
 आप एक प्रोफेशनल भारतीय हिंदी न्यूज़ एंकर हैं।
 
-इस खबर के आधार पर 45 से 60 सेकंड की
-सरल और आकर्षक हिंदी न्यूज़ स्क्रिप्ट लिखें।
+इस खबर के आधार पर लगभग 45 से 60 सेकंड
+की सरल और आकर्षक हिंदी न्यूज़ स्क्रिप्ट लिखें।
 
-खबर:
+खबर का शीर्षक:
 {title}
 
-जानकारी:
+उपलब्ध जानकारी:
 {description}
 
 नियम:
@@ -252,7 +304,7 @@ prompt = f"""
 3. केवल उपलब्ध जानकारी का इस्तेमाल करें।
 4. कोई तथ्य खुद से न बनाएं।
 5. आसान बोलने वाली हिंदी इस्तेमाल करें।
-6. स्क्रिप्ट 45 से 60 सेकंड की हो।
+6. स्क्रिप्ट 45 से 60 सेकंड की रखें।
 7. अंत में चैनल को सब्सक्राइब करने के लिए कहें।
 8. Emoji इस्तेमाल न करें।
 9. केवल स्क्रिप्ट दें।
@@ -281,12 +333,14 @@ script = (
 
 
 with open(
-    "script.txt",
+    SCRIPT_FILE,
     "w",
     encoding="utf-8"
-) as f:
+) as file:
 
-    f.write(script)
+    file.write(
+        script
+    )
 
 
 print(
@@ -294,13 +348,15 @@ print(
 )
 
 
-# =========================================================
-# STEP 4 — HINDI VOICE
-# =========================================================
+# ============================================================
+# STEP 4 — GENERATE HINDI VOICE
+# ============================================================
 
-print(
-    "\nSTEP 4: Generating Hindi voice..."
-)
+print()
+print("==============================================")
+print("STEP 4 — GENERATING HINDI VOICE")
+print("==============================================")
+print()
 
 
 async def generate_voice():
@@ -313,7 +369,7 @@ async def generate_voice():
     )
 
     await communicate.save(
-        "voice.mp3"
+        str(VOICE_FILE)
     )
 
 
@@ -327,13 +383,15 @@ print(
 )
 
 
-# =========================================================
+# ============================================================
 # STEP 5 — CREATE SUBTITLES
-# =========================================================
+# ============================================================
 
-print(
-    "\nSTEP 5: Creating subtitles..."
-)
+print()
+print("==============================================")
+print("STEP 5 — CREATING SUBTITLES")
+print("==============================================")
+print()
 
 
 def split_text(
@@ -349,7 +407,9 @@ def split_text(
 
     for word in words:
 
-        current.append(word)
+        current.append(
+            word
+        )
 
         if len(current) >= words_per_line:
 
@@ -368,7 +428,9 @@ def split_text(
     return lines
 
 
-def format_time(seconds):
+def format_time(
+    seconds
+):
 
     hours = int(
         seconds // 3600
@@ -404,10 +466,10 @@ duration_per_line = 3.5
 
 
 with open(
-    "subtitles.srt",
+    SUBTITLE_FILE,
     "w",
     encoding="utf-8"
-) as f:
+) as file:
 
     for i, line in enumerate(lines):
 
@@ -421,16 +483,16 @@ with open(
             * duration_per_line
         )
 
-        f.write(
+        file.write(
             f"{i + 1}\n"
         )
 
-        f.write(
+        file.write(
             f"{format_time(start)} --> "
             f"{format_time(end)}\n"
         )
 
-        f.write(
+        file.write(
             f"{line}\n\n"
         )
 
@@ -440,30 +502,23 @@ print(
 )
 
 
-# =========================================================
-# STEP 6 — CREATE PROFESSIONAL VIDEO
-# =========================================================
+# ============================================================
+# STEP 6 — CREATE VIDEO
+# ============================================================
 
-print(
-    "\nSTEP 6: Creating professional 9:16 video..."
-)
+print()
+print("==============================================")
+print("STEP 6 — CREATING 9:16 VIDEO")
+print("==============================================")
+print()
 
 
 if (
     image_url
-    and os.path.exists("news.jpg")
+    and IMAGE_FILE.exists()
 ):
 
-    print(
-        "Creating 3 visual scenes..."
-    )
-
-
     filter_complex = (
-
-        # =================================================
-        # SCENE 1
-        # =================================================
 
         "[0:v]"
         "scale=1080:1920:"
@@ -480,11 +535,6 @@ if (
         "setpts=PTS-STARTPTS"
         "[scene1];"
 
-
-        # =================================================
-        # SCENE 2
-        # =================================================
-
         "[0:v]"
         "scale=1300:2300:"
         "force_original_aspect_ratio=increase,"
@@ -499,11 +549,6 @@ if (
         "trim=duration=5,"
         "setpts=PTS-STARTPTS"
         "[scene2];"
-
-
-        # =================================================
-        # SCENE 3
-        # =================================================
 
         "[0:v]"
         "scale=1500:2600:"
@@ -520,11 +565,6 @@ if (
         "setpts=PTS-STARTPTS"
         "[scene3];"
 
-
-        # =================================================
-        # JOIN SCENES
-        # =================================================
-
         "[scene1]"
         "[scene2]"
         "[scene3]"
@@ -532,13 +572,7 @@ if (
         "setpts=PTS-STARTPTS"
         "[video];"
 
-
-        # =================================================
-        # NEWS GRAPHICS
-        # =================================================
-
         "[video]"
-
         "drawbox="
         "x=0:y=0:"
         "w=1080:h=230:"
@@ -563,7 +597,8 @@ if (
         "x=(w-text_w)/2:"
         "y=1680,"
 
-        "subtitles=subtitles.srt:"
+        "subtitles="
+        f"{SUBTITLE_FILE}:"
         "force_style="
         "'FontSize=24,"
         "PrimaryColour=&H00FFFFFF,"
@@ -582,63 +617,52 @@ if (
         "-y",
 
         "-loop",
-
         "1",
 
         "-i",
-
-        "news.jpg",
+        str(IMAGE_FILE),
 
         "-i",
-
-        "voice.mp3",
+        str(VOICE_FILE),
 
         "-filter_complex",
-
         filter_complex,
 
         "-map",
-
         "[final]",
 
         "-map",
-
         "1:a",
 
         "-c:v",
-
         "libx264",
 
         "-preset",
-
         "veryfast",
 
         "-c:a",
-
         "aac",
 
         "-b:a",
-
         "128k",
 
         "-shortest",
 
         "-pix_fmt",
-
         "yuv420p",
 
-        OUTPUT
+        str(OUTPUT_VIDEO)
     ]
 
 
 else:
 
     print(
-        "No image found."
+        "No news image available."
     )
 
     print(
-        "Creating backup video..."
+        "Creating backup video."
     )
 
 
@@ -649,16 +673,13 @@ else:
         "-y",
 
         "-f",
-
         "lavfi",
 
         "-i",
-
         "color=c=black:s=1080x1920",
 
         "-i",
-
-        "voice.mp3",
+        str(VOICE_FILE),
 
         "-vf",
 
@@ -682,7 +703,8 @@ else:
             "x=(w-text_w)/2:"
             "y=1680,"
 
-            "subtitles=subtitles.srt:"
+            "subtitles="
+            f"{SUBTITLE_FILE}:"
             "force_style="
             "'FontSize=24,"
             "PrimaryColour=&H00FFFFFF,"
@@ -693,38 +715,33 @@ else:
         ),
 
         "-c:v",
-
         "libx264",
 
         "-preset",
-
         "veryfast",
 
         "-c:a",
-
         "aac",
 
         "-b:a",
-
         "128k",
 
         "-shortest",
 
         "-pix_fmt",
-
         "yuv420p",
 
-        OUTPUT
+        str(OUTPUT_VIDEO)
     ]
 
 
-# =========================================================
-# STEP 7 — RUN FFMPEG
-# =========================================================
+# ============================================================
+# STEP 7 — RENDER VIDEO
+# ============================================================
 
-print(
-    "\nSTEP 7: Rendering final video..."
-)
+print()
+print("Rendering video...")
+print()
 
 
 subprocess.run(
@@ -733,42 +750,35 @@ subprocess.run(
 )
 
 
-# =========================================================
+# ============================================================
 # FINISHED
-# =========================================================
+# ============================================================
+
+print()
+print("================================================")
+print("        NEWS VIDEO CREATED SUCCESSFULLY")
+print("================================================")
+print()
 
 print(
-    "\n========================================"
+    f"Video       : {OUTPUT_VIDEO}"
 )
 
 print(
-    "PROFESSIONAL NEWS VIDEO CREATED"
+    f"Script      : {SCRIPT_FILE}"
 )
 
 print(
-    "========================================"
+    f"Voice       : {VOICE_FILE}"
 )
 
 print(
-    "Script      : script.txt"
+    f"Subtitles   : {SUBTITLE_FILE}"
 )
 
 print(
-    "Voice       : voice.mp3"
+    f"Image       : {IMAGE_FILE}"
 )
 
-print(
-    "Subtitles   : subtitles.srt"
-)
-
-print(
-    "Image       : news.jpg"
-)
-
-print(
-    "Final video : output.mp4"
-)
-
-print(
-    "\nSUCCESS!"
-)
+print()
+print("SUCCESS!")
